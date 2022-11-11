@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"sort"
 	"strconv"
-	"strings"
 )
 
 type Grade string
@@ -30,25 +33,34 @@ type studentStats struct {
 
 func parseCSV(filePath string) []student {
 
-	students := make([]student, 0)
-
-	lines, err := ReadLines(filePath)
+	csvFile, err := os.Open(filePath)
 	if err != nil {
-		log.SetPrefix("Error: ")
-		log.Print(err.Error())
-		return students
+		log.Println(err)
+		return make([]student, 0)
 	}
+	defer csvFile.Close()
 
-	//empty check
-	if len(lines) <= 1 {
-		return students
-	}
-	//converting each line in file to student type
-	for _, line := range lines[1:] {
-		sData := strings.Split(line, ",")
-		students = append(students,
-			student{sData[0], sData[1], sData[2],
-				parseToInt(sData[3]), parseToInt(sData[4]), parseToInt(sData[5]), parseToInt(sData[6])})
+	reader := csv.NewReader(bufio.NewReader(csvFile))
+	//ignoring headers
+	reader.Read()
+	var students []student
+	for {
+		line, error := reader.Read()
+		if error == io.EOF {
+			break
+		} else if error != nil {
+			log.Println(error)
+		}
+
+		students = append(students, student{
+			firstName:  line[0],
+			lastName:   line[1],
+			university: line[2],
+			test1Score: parseToInt(line[3]),
+			test2Score: parseToInt(line[4]),
+			test3Score: parseToInt(line[5]),
+			test4Score: parseToInt(line[6]),
+		})
 	}
 	return students
 }
@@ -57,8 +69,9 @@ func calculateGrade(students []student) []studentStats {
 	studentStatSlice := make([]studentStats, 0)
 
 	for _, student := range students {
-		grade, finalScore := getGradeAndFinalScore(student)
-		studentStatSlice = append(studentStatSlice, studentStats{student: student, finalScore: finalScore, grade: grade})
+		studentStat := studentStats{student: student, finalScore: 0, grade: F}
+		setGradeAndFinalScore(&studentStat)
+		studentStatSlice = append(studentStatSlice, studentStat)
 	}
 	return studentStatSlice
 }
@@ -79,41 +92,39 @@ func findOverallTopper(gradedStudents []studentStats) studentStats {
 	return max
 }
 
-func findTopperPerUniversity(gradedStudents []studentStats) []studentStats {
+func findTopperPerUniversity(gradedStudents []studentStats) map[string]studentStats {
 	gradedStudentsCopy := make([]studentStats, len(gradedStudents))
 	copy(gradedStudentsCopy, gradedStudents)
 	sort.SliceStable(gradedStudentsCopy, func(i, j int) bool {
 		return gradedStudentsCopy[i].student.university < gradedStudentsCopy[j].student.university
 	})
-	var topperPerUniversitySlice []studentStats
+	var topperPerUniversityMap map[string]studentStats = map[string]studentStats{}
 	j := 0
 	i := 0
 	for i = 0; i < len(gradedStudentsCopy); i++ {
 		if gradedStudentsCopy[j].student.university != gradedStudentsCopy[i].student.university {
-			topperPerUniversitySlice = append(topperPerUniversitySlice, findOverallTopper(gradedStudentsCopy[j:i]))
+			topperPerUniversityMap[gradedStudentsCopy[i].university] = findOverallTopper(gradedStudentsCopy[j:i])
 			j = i
 		}
 	}
-	topperPerUniversitySlice = append(topperPerUniversitySlice, findOverallTopper(gradedStudentsCopy[j:]))
+	topperPerUniversityMap[gradedStudentsCopy[j].university] = findOverallTopper(gradedStudentsCopy[j:])
 
-	return topperPerUniversitySlice
+	return topperPerUniversityMap
 }
 
-func getGradeAndFinalScore(s student) (grade Grade, finalScore float32) {
-	fs := getFinalScore(s)
-	var grd Grade
+func setGradeAndFinalScore(ss *studentStats) {
+	fs := getFinalScore(ss.student)
+	ss.finalScore = fs
 
 	if fs < 35 {
-		grd = F
+		ss.grade = F
 	} else if fs >= 35 && fs < 50 {
-		grd = C
+		ss.grade = C
 	} else if fs >= 50 && fs < 70 {
-		grd = B
+		ss.grade = B
 	} else {
-		grd = A
+		ss.grade = A
 	}
-
-	return grd, fs
 }
 
 func getFinalScore(s student) float32 {
@@ -124,7 +135,7 @@ func parseToInt(input string) int {
 	number, err := strconv.ParseInt(input, 10, 32)
 	//check for error
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err.Error())
 		return 0
 	}
 	return int(number)
@@ -142,4 +153,5 @@ func main() {
 	for i, s := range topperPerUniversitySlice {
 		fmt.Println(i, ":", s)
 	}
+
 }
