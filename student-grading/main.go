@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"sort"
 	"strconv"
 )
 
@@ -25,10 +24,32 @@ type student struct {
 	test1Score, test2Score, test3Score, test4Score int
 }
 
-type studentStats struct {
+func (s student) string() string {
+	return fmt.Sprintf("%v %v %v %v %v %v %v", s.firstName, s.lastName, s.university, s.test1Score, s.test2Score, s.test3Score, s.test4Score)
+}
+
+type studentStat struct {
 	student
 	finalScore float32
 	grade      Grade
+}
+
+func (ss studentStat) string() string {
+	return fmt.Sprintf("%v %v %v",  ss.student.string(), ss.finalScore, ss.grade)
+}
+
+func main() {
+	gradedStudents := calculateGrade(parseCSV("grades.csv"))
+
+	overallTopper := findOverallTopper(gradedStudents)
+	fmt.Println("Overall topper: ", overallTopper.string())
+
+	topperPerUniversity := findTopperPerUniversity(gradedStudents)
+	fmt.Println("------ Topper per university ------")
+	for k, v := range topperPerUniversity {
+		fmt.Println(k, " : ", v.string())
+	}
+
 }
 
 func parseCSV(filePath string) []student {
@@ -45,11 +66,12 @@ func parseCSV(filePath string) []student {
 	reader.Read()
 	var students []student
 	for {
-		line, error := reader.Read()
-		if error == io.EOF {
+		line, err := reader.Read()
+		if err == io.EOF {
 			break
-		} else if error != nil {
-			log.Println(error)
+		}
+		if err != nil {
+			log.Println(err)
 		}
 
 		students = append(students, student{
@@ -65,24 +87,24 @@ func parseCSV(filePath string) []student {
 	return students
 }
 
-func calculateGrade(students []student) []studentStats {
-	studentStatSlice := make([]studentStats, 0)
+func calculateGrade(students []student) []studentStat {
+	studentStats := make([]studentStat, 0)
 
-	for _, student := range students {
-		studentStat := studentStats{student: student, finalScore: 0, grade: F}
-		setGradeAndFinalScore(&studentStat)
-		studentStatSlice = append(studentStatSlice, studentStat)
+	for _, s := range students {
+		ss := studentStat{student: s, finalScore: 0, grade: F}
+		setGradeAndFinalScore(&ss)
+		studentStats = append(studentStats, ss)
 	}
-	return studentStatSlice
+	return studentStats
 }
 
-func findOverallTopper(gradedStudents []studentStats) studentStats {
+func findOverallTopper(gradedStudents []studentStat) studentStat {
+	var max studentStat
 
 	if len(gradedStudents) < 1 {
-		return studentStats{}
+		return max
 	}
-
-	max := gradedStudents[0]
+	max = gradedStudents[0]
 
 	for i := 0; i < len(gradedStudents); i++ {
 		if max.finalScore < gradedStudents[i].finalScore {
@@ -92,27 +114,29 @@ func findOverallTopper(gradedStudents []studentStats) studentStats {
 	return max
 }
 
-func findTopperPerUniversity(gradedStudents []studentStats) map[string]studentStats {
-	gradedStudentsCopy := make([]studentStats, len(gradedStudents))
-	copy(gradedStudentsCopy, gradedStudents)
-	sort.SliceStable(gradedStudentsCopy, func(i, j int) bool {
-		return gradedStudentsCopy[i].student.university < gradedStudentsCopy[j].student.university
-	})
-	var topperPerUniversityMap map[string]studentStats = map[string]studentStats{}
-	j := 0
-	i := 0
-	for i = 0; i < len(gradedStudentsCopy); i++ {
-		if gradedStudentsCopy[j].student.university != gradedStudentsCopy[i].student.university {
-			topperPerUniversityMap[gradedStudentsCopy[i].university] = findOverallTopper(gradedStudentsCopy[j:i])
-			j = i
-		}
-	}
-	topperPerUniversityMap[gradedStudentsCopy[j].university] = findOverallTopper(gradedStudentsCopy[j:])
+func findTopperPerUniversity(gs []studentStat) map[string]studentStat {
+	gsm := make(map[string][]studentStat, 0)
 
-	return topperPerUniversityMap
+	//group student by university using map
+	for _, ss := range gs {
+		val, ok := gsm[ss.student.university]
+		if !ok {
+			gsm[ss.student.university] = []studentStat{{student: ss.student, finalScore: ss.finalScore, grade: ss.grade}}
+			continue
+		}
+		val = append(val, studentStat{student: ss.student, finalScore: ss.finalScore, grade: ss.grade})
+		gsm[ss.student.university] = val
+	}
+
+	tpm := make(map[string]studentStat)
+	fmt.Println("len gsm: ", len(gsm))
+	for k, v := range gsm {
+		tpm[k] = findOverallTopper(v)
+	}
+	return tpm
 }
 
-func setGradeAndFinalScore(ss *studentStats) {
+func setGradeAndFinalScore(ss *studentStat) {
 	fs := getFinalScore(ss.student)
 	ss.finalScore = fs
 
@@ -132,26 +156,11 @@ func getFinalScore(s student) float32 {
 }
 
 func parseToInt(input string) int {
-	number, err := strconv.ParseInt(input, 10, 32)
+	num, err := strconv.ParseInt(input, 10, 32)
 	//check for error
 	if err != nil {
 		log.Println(err.Error())
 		return 0
 	}
-	return int(number)
-}
-
-func main() {
-	gradedStudentsSlice := calculateGrade(parseCSV("grades.csv"))
-
-	overallTopper := findOverallTopper(gradedStudentsSlice)
-
-	fmt.Println("Overall topper: ", overallTopper)
-
-	topperPerUniversitySlice := findTopperPerUniversity(gradedStudentsSlice)
-	fmt.Println("------Topper per university------")
-	for i, s := range topperPerUniversitySlice {
-		fmt.Println(i, ":", s)
-	}
-
+	return int(num)
 }
