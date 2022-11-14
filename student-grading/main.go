@@ -35,7 +35,7 @@ type studentStat struct {
 }
 
 func (ss studentStat) string() string {
-	return fmt.Sprintf("%v %v %v",  ss.student.string(), ss.finalScore, ss.grade)
+	return fmt.Sprintf("%v %v %v", ss.student.string(), ss.finalScore, ss.grade)
 }
 
 func main() {
@@ -49,7 +49,6 @@ func main() {
 	for k, v := range topperPerUniversity {
 		fmt.Println(k, " : ", v.string())
 	}
-
 }
 
 func parseCSV(filePath string) []student {
@@ -115,25 +114,20 @@ func findOverallTopper(gradedStudents []studentStat) studentStat {
 }
 
 func findTopperPerUniversity(gs []studentStat) map[string]studentStat {
-	gsm := make(map[string][]studentStat, 0)
+	tpu := make(map[string]studentStat, 0)
 
 	//group student by university using map
 	for _, ss := range gs {
-		val, ok := gsm[ss.student.university]
-		if !ok {
-			gsm[ss.student.university] = []studentStat{{student: ss.student, finalScore: ss.finalScore, grade: ss.grade}}
-			continue
+		val, ok := tpu[ss.student.university]
+		if ok {
+			if ss.finalScore > val.finalScore {
+				tpu[ss.student.university] = ss
+			}
+		} else {
+			tpu[ss.student.university] = studentStat{student: ss.student, finalScore: ss.finalScore, grade: ss.grade}
 		}
-		val = append(val, studentStat{student: ss.student, finalScore: ss.finalScore, grade: ss.grade})
-		gsm[ss.student.university] = val
 	}
-
-	tpm := make(map[string]studentStat)
-	fmt.Println("len gsm: ", len(gsm))
-	for k, v := range gsm {
-		tpm[k] = findOverallTopper(v)
-	}
-	return tpm
+	return tpu
 }
 
 func setGradeAndFinalScore(ss *studentStat) {
