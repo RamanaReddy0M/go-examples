@@ -123,9 +123,10 @@ func findTopperPerUniversity(gs []studentStat) map[string]studentStat {
 			if ss.finalScore > val.finalScore {
 				tpu[ss.student.university] = ss
 			}
-		} else {
-			tpu[ss.student.university] = studentStat{student: ss.student, finalScore: ss.finalScore, grade: ss.grade}
+			continue
 		}
+		tpu[ss.student.university] = studentStat{student: ss.student, finalScore: ss.finalScore, grade: ss.grade}
+
 	}
 	return tpu
 }
