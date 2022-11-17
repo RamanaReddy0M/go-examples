@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,21 @@ type Option struct {
 	option      string
 	value       int
 	description string
+}
+
+type FileCount struct {
+	dirCnt, fileCnt int
+}
+
+type TreeConfig struct {
+	reqRelPath, reqOnlyDir, reqFilePermsn bool
+	level                                 int
+	paths                                 []string
+}
+
+func NewTreeConfig() *TreeConfig {
+	config := new(TreeConfig)
+	return config
 }
 
 const (
@@ -24,24 +40,39 @@ const (
 	BoxDowAndLef = "┐"
 	BoxUpAndRig  = "└"
 	BoxUpAndLef  = "┘"
+
+	Command = "tree"
+	Spaces3 = "	  "
+	Spaces4 = Spaces3 + " "
 )
 
-type FileCount struct {
-	dirCnt, fileCnt int
-}
+func ParseCommand(cmd string) TreeConfig {
+	regxCmpl := regexp.MustCompile(`\s+`)
+	cmd = strings.TrimSpace(regxCmpl.ReplaceAllString(cmd, " "))
 
-func ParseCommand(cmd string) map[string]Option {
-	options := make(map[string]Option)
-	ca := strings.Split(cmd, " ")
-	if len(ca) < 2 {
-		return options
+	ca := strings.Split(cmd, " ") //args in command
+
+	if strings.TrimSpace(ca[0]) != Command {
+		log.Fatalf("command not found: `%v`", ca[0])
 	}
-	for i, op := range ca[1:] {
+
+	config := NewTreeConfig()
+
+	for i := 1; i < len(ca); i++ {
+		v := ca[i]
+
+		// check for path
+		if !strings.HasPrefix(v, "-") && !regexp.MustCompile(`\d`).MatchString(v) {
+			config.paths = append(config.paths, v)
+			continue
+		}
+
+		op := v //op: option
 		switch op {
 		case "-d":
-			options["d"] = Option{"-d", 0, "prints only directories"}
+			config.reqOnlyDir = true
 		case "-f":
-			options["f"] = Option{"-f", 0, "prints relative path of each file"}
+			config.reqRelPath = true
 		case "-L":
 			if len(ca) < i+1 {
 				log.Fatal("-L option requires value")
@@ -50,14 +81,19 @@ func ParseCommand(cmd string) map[string]Option {
 			if lVal < 1 {
 				log.Fatal("-L value greater than 0")
 			}
-			options["L"] = Option{"-L", lVal, "travese specified nested levels only"}
+			config.level = lVal
+			i++
 		case "-p":
-			options["p"] = Option{"-p", 0, "prints permission along with file name"}
+			config.reqFilePermsn = true
 		default:
-			//log.Fatalf("Invalid argument `%v`", op)
+			log.Fatalf("Invalid argument `%v`", op)
 		}
 	}
-	return options
+
+	if len(config.paths) < 1 {
+		config.paths = []string{"."}
+	}
+	return *config
 }
 
 func parseToInt(input string) int {
@@ -70,39 +106,30 @@ func parseToInt(input string) int {
 	return int(num)
 }
 
-func ListDirAndFiles(cmd string) string {
-	fc := FileCount{dirCnt: 0, fileCnt: 0}
-	args := strings.Split(cmd, " ")
-	root := args[len(args)-1]
-
-	ops := ParseCommand(cmd)
-
-	empOpt := Option{}
-	relPath := ops["f"] != empOpt
-	permsn := ops["p"] != empOpt
-	reqOnlyDir := ops["d"] != empOpt
-	level := 0
-	if ops["L"] != empOpt {
-		level = ops["L"].value
-		fmt.Println("level: ", level)
+func ListDirAndFiles(config TreeConfig) string {
+	var fc FileCount
+	temp := ""
+	for _, p := range config.paths {
+		fc = FileCount{}
+		root := strings.TrimSuffix(p, "/")
+		temp += recListDirAndFiles(root, root+"\n", 0, false, &fc, &config)
 	}
-
-	temp := recListDirAndFiles(root, root+"\n", 0, &fc, false, relPath, permsn, reqOnlyDir, level)
 
 	return fmt.Sprintf("%v \n %v directory, %v files", temp, fc.dirCnt, fc.fileCnt)
 }
 
-func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDir bool, reqRelPath bool, permsn bool, reqOnlyDir bool, level int) string {
+func recListDirAndFiles(root string, temp string, n int, isLastDir bool, fc *FileCount, config *TreeConfig) string {
 	files := ReadDir(root)
 
-	if len(files) < 1 || (level > 0 && n == level) {
+	if len(files) < 1 || (config.level > 0 && n == config.level) {
 		return temp
 	}
 
 	lastFile := files[len(files)-1]
 
 	for _, val := range files {
-		if val.Name() == ".git" {
+		//ignoring file start with `.`
+		if strings.HasPrefix(val.Name(), ".") {
 			continue
 		}
 
@@ -112,15 +139,15 @@ func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDi
 		isLastFile := lastFile == val
 		var relPath, fp string // fp: file permission
 
-		if reqRelPath {
+		if config.reqRelPath {
 			relPath = " " + root + "/" + val.Name()
 			ap = relPath
 		}
-		if permsn {
+		if config.reqFilePermsn {
 			fp = " [" + getPermsnMode(val) + "] "
 			ap = fp + val.Name()
 		}
-		if reqRelPath && permsn {
+		if config.reqRelPath && config.reqFilePermsn {
 			ap = fp + relPath
 		}
 
@@ -145,7 +172,7 @@ func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDi
 		}
 
 		if !val.IsDir() { // file
-			if reqOnlyDir {
+			if config.reqOnlyDir {
 				continue
 			}
 			temp += bp + pipe + ap + "\n"
@@ -156,7 +183,7 @@ func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDi
 		isLastDir = isLastFile && lastFile.IsDir()
 		fc.dirCnt++
 		temp += bp + pipe + ap + "\n"
-		temp = recListDirAndFiles(root+"/"+val.Name(), temp, n+1, fc, isLastDir, reqRelPath, permsn, reqOnlyDir, level)
+		temp = recListDirAndFiles(root+"/"+val.Name(), temp, n+1, isLastDir, fc, config)
 	}
 
 	return temp
@@ -197,4 +224,13 @@ func OrderDirAndFiles(files []fs.DirEntry) []fs.DirEntry {
 		df["files"] = append(df["files"], f)
 	}
 	return append(df["directories"], df["files"]...)
+}
+
+func help() {
+	options := make(map[string]Option)
+	options["d"] = Option{"-d", 0, "prints only directories"}
+	options["f"] = Option{"-f", 0, "prints relative path of each file"}
+	options["L"] = Option{"-L", 0, "travese specified nested levels only"}
+	options["p"] = Option{"-p", 0, "prints permission along with file name"}
+	fmt.Println("help: ", options)
 }
