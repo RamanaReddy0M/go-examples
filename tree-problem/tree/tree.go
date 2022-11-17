@@ -30,7 +30,7 @@ type FileCount struct {
 	dirCnt, fileCnt int
 }
 
-func ParseCommand(cmd string) map[string]Option{
+func ParseCommand(cmd string) map[string]Option {
 	options := make(map[string]Option)
 	ca := strings.Split(cmd, " ")
 	if len(ca) < 2 {
@@ -52,7 +52,7 @@ func ParseCommand(cmd string) map[string]Option{
 			}
 			options["L"] = Option{"-L", lVal, "travese specified nested levels only"}
 		case "-p":
-			options["p"] = Option{"-p", 0, "prints print permission along with file name"}
+			options["p"] = Option{"-p", 0, "prints permission along with file name"}
 		default:
 			//log.Fatalf("Invalid argument `%v`", op)
 		}
@@ -72,18 +72,27 @@ func parseToInt(input string) int {
 
 func ListDirAndFiles(cmd string) string {
 	fc := FileCount{dirCnt: 0, fileCnt: 0}
-	args := strings.Split(" ", cmd)
+	args := strings.Split(cmd, " ")
 	root := args[len(args)-1]
 
 	ops := ParseCommand(cmd)
-	fmt.Println("options: ", ops, root)
-	temp := recListDirAndFiles(root, root+"\n", 0, &fc, false, false, false, true, 0)
+
+	empOpt := Option{}
+	relPath := ops["f"] != empOpt
+	permsn := ops["p"] != empOpt
+	reqOnlyDir := ops["d"] != empOpt
+	level := 0
+	if ops["L"] != empOpt {
+		level = ops["L"].value
+		fmt.Println("level: ", level)
+	}
+
+	temp := recListDirAndFiles(root, root+"\n", 0, &fc, false, relPath, permsn, reqOnlyDir, level)
 
 	return fmt.Sprintf("%v \n %v directory, %v files", temp, fc.dirCnt, fc.fileCnt)
 }
 
 func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDir bool, reqRelPath bool, permsn bool, reqOnlyDir bool, level int) string {
-
 	files := ReadDir(root)
 
 	if len(files) < 1 || (level > 0 && n == level) {
@@ -136,6 +145,9 @@ func recListDirAndFiles(root string, temp string, n int, fc *FileCount, isLastDi
 		}
 
 		if !val.IsDir() { // file
+			if reqOnlyDir {
+				continue
+			}
 			temp += bp + pipe + ap + "\n"
 			fc.fileCnt++
 			continue
@@ -167,6 +179,7 @@ func getPermsnMode(f fs.DirEntry) string {
 	}
 	return fi.Mode().String()
 }
+
 func OrderDirAndFiles(files []fs.DirEntry) []fs.DirEntry {
 	if len(files) < 1 {
 		return []fs.DirEntry{}
@@ -184,13 +197,4 @@ func OrderDirAndFiles(files []fs.DirEntry) []fs.DirEntry {
 		df["files"] = append(df["files"], f)
 	}
 	return append(df["directories"], df["files"]...)
-}
-
-func hasSubDir(files []fs.DirEntry) bool {
-	for _, f := range files {
-		if f.IsDir() {
-			return true
-		}
-	}
-	return false
 }
