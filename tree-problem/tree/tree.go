@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -21,20 +22,20 @@ type FileCount struct {
 }
 
 type TreeConfig struct {
-	reqRelPath, reqOnlyDir, reqFilePermsn bool
-	level                                 int
-	paths                                 []string
+	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime bool
+	level                                                int
+	paths                                                []string
 }
 
 const (
 	//Box Drawing Characters
-	BoxVer        = "│"
-	BoxHor        = "──"
-	BoxVH         = BoxVer + BoxHor
-	BoxDowAndRig  = "┌"
-	BoxDowAndLef  = "┐"
-	BoxUpAndRig   = "└"
-	BoxUpAndLef   = "┘"
+	BoxVer       = "│"
+	BoxHor       = "──"
+	BoxVH        = BoxVer + BoxHor
+	BoxDowAndRig = "┌"
+	BoxDowAndLef = "┐"
+	BoxUpAndRig  = "└"
+	BoxUpAndLef  = "┘"
 
 	OpenBrkt      = "["
 	CloseBrkt     = "]"
@@ -84,6 +85,8 @@ func ParseCommand(cmd string) TreeConfig {
 			i++
 		case "-p":
 			config.reqFilePermsn = true
+		case "-t":
+			config.sortByModTime = true
 		default:
 			// check for path
 			if !strings.HasPrefix(v, "-") {
@@ -104,59 +107,35 @@ func ListDirAndFiles(config TreeConfig) string {
 	var fc FileCount
 	var isNthDirLast []bool
 	temp := ""
-	
 	for _, p := range config.paths {
 		fc = FileCount{}
 		isNthDirLast = []bool{}
 		root := strings.TrimSuffix(p, PathSeperator)
-		temp += recListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
+		temp += RecListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
 	}
-	return fmt.Sprintf("%v %v %v directory, %v files", temp, NewLine, fc.dirCnt, fc.fileCnt)
+	return formatRes(temp, fc, config)
 }
 
-func ReadDir(root string) []fs.DirEntry {
-	files, err := os.ReadDir(root)
-	if err != nil {
-		fmt.Println(err)
-		return make([]fs.DirEntry, 0)
-	}
-	return files
-}
+func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, fc *FileCount, config *TreeConfig) string {
 
-func OrderDirAndFiles(files []fs.DirEntry) []fs.DirEntry {
-	if len(files) < 1 {
-		return []fs.DirEntry{}
+	files := IgnoreDotFiles(ReadDir(root))
+
+	if config.reqOnlyDir {
+		files = ReadOnlyDir(files)
 	}
 
-	df := make(map[string][]fs.DirEntry)
-	df["directories"] = []fs.DirEntry{}
-	df["files"] = []fs.DirEntry{}
-
-	for _, f := range files {
-		if f.IsDir() {
-			df["directories"] = append(df["directories"], f)
-			continue
-		}
-		df["files"] = append(df["files"], f)
+	if config.sortByModTime {
+		SortByModTime(files)
 	}
-	return append(df["directories"], df["files"]...)
-}
-
-func recListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, fc *FileCount, config *TreeConfig) string {
-	files := ReadDir(root)
 
 	if len(files) < 1 || (config.level > 0 && n == config.level) {
+		*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
 		return temp
 	}
 
 	lastFile := files[len(files)-1]
 
 	for _, f := range files {
-		//ignoring file start with `.`
-		if strings.HasPrefix(f.Name(), ".") {
-			continue
-		}
-
 		bp := "" // before pipe
 		pipe := BoxVH
 		ap := Space + f.Name() //after pipe
@@ -171,25 +150,71 @@ func recListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, f
 		bp = getBeforePipeVal(n, *isNthDirLast)
 
 		if !f.IsDir() { // file
-			if config.reqOnlyDir {
-				continue
-			}
 			temp += bp + pipe + ap + NewLine
 			fc.fileCnt++
 			continue
 		}
-		//directory
+
 		temp += bp + pipe + ap + NewLine
 		fc.dirCnt++
 		//tracking information(whether directory last or not) from 0 to Nth level directory
 		*isNthDirLast = append(*isNthDirLast, isLastFile)
-		temp = recListDirAndFiles(root+PathSeperator+f.Name(), temp, n+1, isNthDirLast, fc, config)
+		temp = RecListDirAndFiles(root+PathSeperator+f.Name(), temp, n+1, isNthDirLast, fc, config)
 	}
 
-	if n > 0 && len(*isNthDirLast) > 0 {
-		*isNthDirLast = (*isNthDirLast)[:n-1]
-	}
+	*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
 	return temp
+}
+
+func ReadDir(root string) []fs.DirEntry {
+	files, err := os.ReadDir(root)
+	if err != nil {
+		fmt.Println(err)
+		return make([]fs.DirEntry, 0)
+	}
+	return files
+}
+
+func IgnoreDotFiles(files []fs.DirEntry) []fs.DirEntry {
+	fs := make([]fs.DirEntry, 0)
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name(), ".") {
+			fs = append(fs, f)
+		}
+	}
+	return fs
+}
+
+func ReadOnlyDir(files []fs.DirEntry) []fs.DirEntry {
+	dirs := make([]fs.DirEntry, 0)
+	for _, f := range files {
+		if f.IsDir() {
+			dirs = append(dirs, f)
+		}
+	}
+	return dirs
+}
+
+func SortByModTime(files []fs.DirEntry) {
+	sort.Slice(files, func(i, j int) bool {
+		return getFileInfo(files[i]).ModTime().Unix() < getFileInfo(files[j]).ModTime().Unix()
+	})
+}
+
+func resizeToNMinus1(n int, sl []bool) []bool {
+	if n > 0 && len(sl) > 0 {
+		sl = sl[:n-1]
+	}
+	return sl
+}
+
+func getFileInfo(fs fs.DirEntry) fs.FileInfo {
+	fi, err := fs.Info()
+	if err != nil {
+		fmt.Println(OpenBrkt + err.Error() + CloseBrkt)
+		return fi
+	}
+	return fi
 }
 
 func getAfterPipeVal(root string, fi fs.DirEntry, config TreeConfig, ap string) string {
@@ -234,6 +259,25 @@ func getBeforePipeVal(n int, isNthDirLast []bool) string {
 		bp += Spaces4
 	}
 	return bp
+}
+
+func formatRes(temp string, fc FileCount, config TreeConfig) string {
+	op := ""
+	dirStr := fmt.Sprintf("%v directories", fc.dirCnt)
+	if fc.dirCnt == 1 {
+		dirStr = fmt.Sprintf("%v directory", fc.dirCnt)
+	}
+
+	fileStr := fmt.Sprintf("%v files", fc.fileCnt)
+	if fc.dirCnt == 1 {
+		fileStr = fmt.Sprintf("%v file", fc.fileCnt)
+	}
+
+	op = fmt.Sprintf("%v %v %v", temp, NewLine, dirStr)
+	if !config.reqOnlyDir {
+		op = fmt.Sprintf("%v , %v", op, fileStr)
+	}
+	return op
 }
 
 func parseToInt(input string) int {
