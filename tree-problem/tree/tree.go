@@ -11,31 +11,22 @@ import (
 	"strings"
 )
 
-type Option struct {
-	option      string
-	value       int
-	description string
-}
-
 type FileCount struct {
 	dirCnt, fileCnt int
 }
 
 type TreeConfig struct {
-	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime bool
-	level                                                int
-	paths                                                []string
+	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime, noIndent bool
+	level                                                          int
+	paths                                                          []string
 }
 
 const (
 	//Box Drawing Characters
-	BoxVer       = "│"
-	BoxHor       = "──"
-	BoxVH        = BoxVer + BoxHor
-	BoxDowAndRig = "┌"
-	BoxDowAndLef = "┐"
-	BoxUpAndRig  = "└"
-	BoxUpAndLef  = "┘"
+	BoxVer      = "│"
+	BoxHor      = "──"
+	BoxVH       = BoxVer + BoxHor
+	BoxUpAndRig = "└"
 
 	OpenBrkt      = "["
 	CloseBrkt     = "]"
@@ -53,6 +44,7 @@ func NewTreeConfig() *TreeConfig {
 }
 
 func ParseCommand(cmd string) TreeConfig {
+	//remove extra spaces in cmd
 	regxCmpl := regexp.MustCompile(`\s+`)
 	cmd = strings.TrimSpace(regxCmpl.ReplaceAllString(cmd, " "))
 
@@ -65,14 +57,14 @@ func ParseCommand(cmd string) TreeConfig {
 	config := NewTreeConfig()
 
 	for i := 1; i < len(ca); i++ {
-		v := ca[i]
-
-		op := v //op: option
-		switch op {
+		arg := ca[i] //op: option
+		switch arg {
 		case "-d":
 			config.reqOnlyDir = true
 		case "-f":
 			config.reqRelPath = true
+		case "-i":
+			config.noIndent = true
 		case "-L":
 			if len(ca) < i+1 {
 				log.Fatal("-L option requires value")
@@ -89,11 +81,11 @@ func ParseCommand(cmd string) TreeConfig {
 			config.sortByModTime = true
 		default:
 			// check for path
-			if !strings.HasPrefix(v, "-") {
-				config.paths = append(config.paths, v)
+			if !strings.HasPrefix(arg, "-") {
+				config.paths = append(config.paths, arg)
 				continue
 			}
-			log.Fatalf("Invalid argument `%v`", op)
+			log.Fatalf("Invalid argument `%v`", arg)
 		}
 	}
 
@@ -117,16 +109,7 @@ func ListDirAndFiles(config TreeConfig) string {
 }
 
 func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, fc *FileCount, config *TreeConfig) string {
-
-	files := IgnoreDotFiles(ReadDir(root))
-
-	if config.reqOnlyDir {
-		files = ReadOnlyDir(files)
-	}
-
-	if config.sortByModTime {
-		SortByModTime(files)
-	}
+	files := GetFiles(root, *config)
 
 	if len(files) < 1 || (config.level > 0 && n == config.level) {
 		*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
@@ -136,26 +119,19 @@ func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, f
 	lastFile := files[len(files)-1]
 
 	for _, f := range files {
-		bp := "" // before pipe
-		pipe := BoxVH
-		ap := Space + f.Name() //after pipe
+		bp := getBeforePipeVal(n, *isNthDirLast, *config) // before pipe
+
 		isLastFile := lastFile == f
+		pipe := getPipeVal(isLastFile, *config) // pipe (│── or └──)
 
-		ap = getAfterPipeVal(root, f, *config, ap)
+		ap := getAfterPipeVal(root, f, *config) // after pipe
 
-		if isLastFile {
-			pipe = BoxUpAndRig + BoxHor
-		}
-
-		bp = getBeforePipeVal(n, *isNthDirLast)
+		temp += bp + pipe + ap + NewLine //line structure in tree
 
 		if !f.IsDir() { // file
-			temp += bp + pipe + ap + NewLine
 			fc.fileCnt++
 			continue
 		}
-
-		temp += bp + pipe + ap + NewLine
 		fc.dirCnt++
 		//tracking information(whether directory last or not) from 0 to Nth level directory
 		*isNthDirLast = append(*isNthDirLast, isLastFile)
@@ -164,6 +140,19 @@ func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, f
 
 	*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
 	return temp
+}
+
+func GetFiles(root string, config TreeConfig) []fs.DirEntry {
+	files := IgnoreDotFiles(ReadDir(root))
+
+	if config.reqOnlyDir {
+		files = ReadOnlyDir(files)
+	}
+
+	if config.sortByModTime {
+		SortByModTime(files)
+	}
+	return files
 }
 
 func ReadDir(root string) []fs.DirEntry {
@@ -217,8 +206,41 @@ func getFileInfo(fs fs.DirEntry) fs.FileInfo {
 	return fi
 }
 
-func getAfterPipeVal(root string, fi fs.DirEntry, config TreeConfig, ap string) string {
-	var relPath, fp string // fp: file permission
+func getBeforePipeVal(n int, isNthDirLast []bool, config TreeConfig) string {
+	bp := ""
+	if config.noIndent {
+		return bp
+	}
+
+	if n < 1 || n > len(isNthDirLast) {
+		return bp
+	}
+
+	for i := 0; i < n; i++ {
+		if !isNthDirLast[i] {
+			bp += BoxVer + Spaces3
+			continue
+		}
+		bp += Spaces4
+	}
+	return bp
+}
+
+func getPipeVal(isLastFile bool, config TreeConfig) string {
+	pipe := BoxVH //
+	if isLastFile {
+		pipe = BoxUpAndRig + BoxHor // └──
+	}
+	if config.noIndent {
+		pipe = ""
+	}
+	return pipe
+}
+
+func getAfterPipeVal(root string, fi fs.DirEntry, config TreeConfig) string {
+	ap := Space + fi.Name() //after pipe
+	var relPath, fp string  // fp: file permission
+
 	if config.reqRelPath {
 		relPath = Space + root + PathSeperator + fi.Name()
 		ap = relPath
@@ -242,23 +264,6 @@ func getPermsnMode(f fs.DirEntry) string {
 		return "Unable read mode"
 	}
 	return fi.Mode().String()
-}
-
-func getBeforePipeVal(n int, isNthDirLast []bool) string {
-	bp := ""
-
-	if n < 1 || n > len(isNthDirLast) {
-		return bp
-	}
-
-	for i := 0; i < n; i++ {
-		if !isNthDirLast[i] {
-			bp += BoxVer + Spaces3
-			continue
-		}
-		bp += Spaces4
-	}
-	return bp
 }
 
 func formatRes(temp string, fc FileCount, config TreeConfig) string {
@@ -288,13 +293,4 @@ func parseToInt(input string) int {
 		return 0
 	}
 	return int(num)
-}
-
-func help() {
-	options := make(map[string]Option)
-	options["d"] = Option{"-d", 0, "prints only directories"}
-	options["f"] = Option{"-f", 0, "prints relative path of each file"}
-	options["L"] = Option{"-L", 0, "travese specified nested levels only"}
-	options["p"] = Option{"-p", 0, "prints permission along with file name"}
-	fmt.Println("help: ", options)
 }
