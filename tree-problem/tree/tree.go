@@ -274,7 +274,7 @@ func formatRes(temp string, fc FileCount, config TreeConfig) string {
 	}
 
 	fileStr := fmt.Sprintf("%v files", fc.fileCnt)
-	if fc.dirCnt == 1 {
+	if fc.fileCnt == 1 {
 		fileStr = fmt.Sprintf("%v file", fc.fileCnt)
 	}
 

@@ -17,6 +17,21 @@ func TestListDirAndFiles(t *testing.T) {
 	want := "../resources/test-dir/empty\n\n0 directories, 0 files"
 	assert.Equal(want, got, "empty directory test")
 
+	//No paths in command test
+	cmd = "tree"
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = ".\n│── tree.go\n└── tree_test.go\n\n0 directories, 2 files"
+	assert.Equal(want, got, "No path in command test")
+
+	//Single file in directory test
+	path = "../resources/test-dir/hello/temp"
+	cmd = "tree " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "../resources/test-dir/hello/temp\n└── temp.txt\n\n0 directories, 1 file"
+	assert.Equal(want, got, "Single file in directory test")
+
 	//directory with multiple files test
 	path = "../resources/test-dir/"
 	cmd = "tree " + path
@@ -117,4 +132,19 @@ func TestListDirAndFiles(t *testing.T) {
 		"                 │── [drwxr-xr-x] temp\n│                   └── [drwxr-xr-x] xelo\n" +
 		"└── [drwxr-xr-x] META-INF\n    └── [drwxr-xr-x] empty\n\n10 directories"
 	assert.Equal(want, got, "Parsing command with odd spaces and mutiple args test")
+
+	//List files in multiple paths test
+	paths := "../resources/level-test-dir ../resources/test-dir"
+	cmd = "tree " + paths
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "../resources/level-test-dir\n│── META-INF\n│   └── empty\n└── in\n    └── one2n\n        " +
+		"└── tree-prblm\n            └── test-dir\n                │── empty\n                " +
+		"└── hello\n                    │── hello.txt\n                    │── temp\n         " +
+		"           │   └── temp.txt\n                    └── xelo\n                        " +
+		"└── lwlo.rx\n" +
+		"../resources/test-dir\n│── empty\n└── hello\n    │── hello.txt\n    │── temp\n    │   " +
+		"└── temp.txt\n    └── xelo\n        └── lwlo.rx\n\n4 directories, 3 files"
+	assert.Equal(want, got, "Parsing command with odd spaces and mutiple args test")
+
 }
