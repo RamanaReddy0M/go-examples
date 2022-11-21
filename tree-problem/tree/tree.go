@@ -46,7 +46,7 @@ func NewTreeConfig() *TreeConfig {
 func ParseCommand(cmd string) TreeConfig {
 	//remove extra spaces in cmd
 	regxCmpl := regexp.MustCompile(`\s+`)
-	cmd = strings.TrimSpace(regxCmpl.ReplaceAllString(cmd, " "))
+	cmd = strings.TrimSpace(regxCmpl.ReplaceAllString(cmd, Space))
 
 	ca := strings.Split(cmd, Space) //args in command
 
@@ -278,9 +278,9 @@ func formatRes(temp string, fc FileCount, config TreeConfig) string {
 		fileStr = fmt.Sprintf("%v file", fc.fileCnt)
 	}
 
-	op = fmt.Sprintf("%v %v %v", temp, NewLine, dirStr)
+	op = fmt.Sprintf("%v%v%v", temp, NewLine, dirStr)
 	if !config.reqOnlyDir {
-		op = fmt.Sprintf("%v , %v", op, fileStr)
+		op = fmt.Sprintf("%v, %v", op, fileStr)
 	}
 	return op
 }
