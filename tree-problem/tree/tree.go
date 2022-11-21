@@ -16,9 +16,9 @@ type FileCount struct {
 }
 
 type TreeConfig struct {
-	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime, noIndent bool
-	level                                                          int
-	paths                                                          []string
+	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime, noIndent, reqXmlFormat bool
+	level                                                                        int
+	paths                                                                        []string
 }
 
 const (
@@ -30,6 +30,9 @@ const (
 
 	OpenBrkt      = "["
 	CloseBrkt     = "]"
+	OpenTag       = "<"
+	Slash         = "/"
+	CloseTag      = ">"
 	Command       = "tree"
 	PathSeperator = string(os.PathSeparator)
 	NewLine       = "\n"
@@ -79,6 +82,8 @@ func ParseCommand(cmd string) TreeConfig {
 			config.reqFilePermsn = true
 		case "-t":
 			config.sortByModTime = true
+		case "-X":
+			config.reqXmlFormat = true
 		default:
 			// check for path
 			if !strings.HasPrefix(arg, "-") {
@@ -103,6 +108,10 @@ func ListDirAndFiles(config TreeConfig) string {
 		fc = FileCount{}
 		isNthDirLast = []bool{}
 		root := strings.TrimSuffix(p, PathSeperator)
+		if config.reqXmlFormat {
+			temp += RecListDirAndFilesInXML(root, temp, 0, &fc, &config)
+			continue
+		}
 		temp += RecListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
 	}
 	return formatRes(temp, fc, config)
@@ -139,6 +148,34 @@ func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, f
 	}
 
 	*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
+	return temp
+}
+
+func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
+	files := GetFiles(root, *config)
+
+	if n == 0 {
+		temp += strings.Repeat(Space, n+2) + OpenTag + "directory name=\"" + root + CloseTag + NewLine
+	}
+
+	for _, f := range files {
+		if !f.IsDir() { // file
+			temp += strings.Repeat(Space, n+5) + OpenTag + "file" + getFileAttrsVal(f, *config) + CloseTag + OpenTag + Slash + "file" + CloseTag + NewLine
+			fc.fileCnt++
+			continue
+		}
+		temp += strings.Repeat(Space, n+4) + OpenTag + "directory" + getFileAttrsVal(f, *config) + CloseTag + NewLine
+		fc.dirCnt++
+		temp = RecListDirAndFilesInXML(root+PathSeperator+f.Name(), temp, n+1, fc, config)
+	}
+
+	closeDirTag := OpenTag + Slash + "directory" + CloseTag + NewLine
+
+	if n > 0 {
+		return temp + strings.Repeat(Space, n+3) + closeDirTag
+	}
+
+	temp += strings.Repeat(Space, n+2) + closeDirTag
 	return temp
 }
 
@@ -247,7 +284,7 @@ func getAfterPipeVal(root string, fi fs.DirEntry, config TreeConfig) string {
 	}
 
 	if config.reqFilePermsn {
-		fp = Space + OpenBrkt + getPermsnMode(fi) + CloseBrkt + Space
+		fp = Space + OpenBrkt + getPermsnMode(fi, false) + CloseBrkt + Space
 		ap = fp + fi.Name()
 	}
 
@@ -257,28 +294,61 @@ func getAfterPipeVal(root string, fi fs.DirEntry, config TreeConfig) string {
 	return ap
 }
 
-func getPermsnMode(f fs.DirEntry) string {
+func getPermsnMode(f fs.DirEntry, inOctal bool) string {
 	fi, err := f.Info()
 	if err != nil {
 		fmt.Println(err)
 		return "Unable read mode"
 	}
-	return fi.Mode().String()
+	perm := fi.Mode()
+	res := perm.String()
+	if inOctal {
+		res = fmt.Sprintf("%#o", perm.Perm())
+	}
+	return res
+}
+
+func getFileAttrsVal(file fs.DirEntry, config TreeConfig) string {
+	attrs := " name=\"" + file.Name() + "\""
+	if config.reqFilePermsn {
+		attrs += " mode=\"" + getPermsnMode(file, true) + "\""
+		attrs += " prot=\"" + getPermsnMode(file, false) + "\""
+	}
+	return attrs
 }
 
 func formatRes(temp string, fc FileCount, config TreeConfig) string {
 	op := ""
-	dirStr := fmt.Sprintf("%v directories", fc.dirCnt)
-	if fc.dirCnt == 1 {
-		dirStr = fmt.Sprintf("%v directory", fc.dirCnt)
+	dirStr := ""
+	fileStr := ""
+	if !config.reqXmlFormat {
+		dirStr = fmt.Sprintf("%v directories", fc.dirCnt)
+		if fc.dirCnt == 1 {
+			dirStr = fmt.Sprintf("%v directory", fc.dirCnt)
+		}
+
+		fileStr = fmt.Sprintf("%v files", fc.fileCnt)
+		if fc.fileCnt == 1 {
+			fileStr = fmt.Sprintf("%v file", fc.fileCnt)
+		}
+		op = fmt.Sprintf("%v%v%v", temp, NewLine, dirStr)
 	}
 
-	fileStr := fmt.Sprintf("%v files", fc.fileCnt)
-	if fc.fileCnt == 1 {
-		fileStr = fmt.Sprintf("%v file", fc.fileCnt)
+	if config.reqXmlFormat {
+		header := "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+
+		if config.reqXmlFormat {
+			dirStr = fmt.Sprintf("<directories>%v</directories>", fc.dirCnt)
+		}
+		if config.reqXmlFormat {
+			fileStr = fmt.Sprintf("<files>%v</files>", fc.dirCnt)
+		}
+
+		report := fmt.Sprintf("  <report>\n   %v\n   %v\n  </report>", dirStr, fileStr)
+
+		return fmt.Sprintf("%v<tree>\n%v%v\n</tree>", header, temp, report)
 	}
 
-	op = fmt.Sprintf("%v%v%v", temp, NewLine, dirStr)
 	if !config.reqOnlyDir {
 		op = fmt.Sprintf("%v, %v", op, fileStr)
 	}
