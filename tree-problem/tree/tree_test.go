@@ -147,4 +147,71 @@ func TestListDirAndFiles(t *testing.T) {
 		"└── temp.txt\n    └── xelo\n        └── lwlo.rx\n\n4 directories, 3 files"
 	assert.Equal(want, got, "Parsing command with odd spaces and mutiple args test")
 
+	//XML format empty dir test
+	path = "../resources/test-dir/empty"
+	cmd = "tree -X " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
+		"<directory name=\"../resources/test-dir/empty>\n  </directory>\n  <report>\n   " +
+		"<directories>0</directories>\n   <files>0</files>\n  </report>\n</tree>"
+	assert.Equal(want, got, "XML format empty dir test")
+
+	//XML format single file in directory test
+	path = "../resources/test-dir/hello/temp"
+	cmd = "tree -X " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
+		"<directory name=\"../resources/test-dir/hello/temp>\n    <file name=\"temp.txt\"></file>\n " +
+		" </directory>\n  <report>\n   <directories>0</directories>\n   <files>0</files>\n  " +
+		"</report>\n</tree>"
+	assert.Equal(want, got, "XML format single file in directory test")
+
+	//XML format Level 5 directories test
+	path = "../resources/level-test-dir"
+	cmd = "tree -L 5 -X " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
+		"<directory name=\"../resources/level-test-dir>\n    <directory name=\"META-INF\">\n     " +
+		"<directory name=\"empty\">\n     </directory>\n    </directory>\n    <directory name=\"in\">\n" +
+		"     <directory name=\"one2n\">\n      <directory name=\"tree-prblm\">\n       " +
+		"<directory name=\"test-dir\">\n        <directory name=\"empty\">\n        </directory>\n" +
+		"        <directory name=\"hello\">\n        </directory>\n       </directory>\n      " +
+		"</directory>\n     </directory>\n    </directory>\n  </directory>\n  <report>\n   " +
+		"<directories>8</directories>\n   <files>8</files>\n  </report>\n</tree>"
+	assert.Equal(want, got, "XML format Level 5 directories test")
+
+	//Files in XML format with permission mode test
+	path = "../resources/test-dir/"
+	cmd = "tree -p -X " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
+		"<directory name=\"../resources/test-dir>\n    " +
+		"<directory name=\"empty\" mode=\"0755\" prot=\"drwxr-xr-x\">\n    </directory>\n    " +
+		"<directory name=\"hello\" mode=\"0755\" prot=\"drwxr-xr-x\">\n     " +
+		"<file name=\"hello.txt\" mode=\"0644\" prot=\"-rw-r--r--\"></file>\n     " +
+		"<directory name=\"temp\" mode=\"0755\" prot=\"drwxr-xr-x\">\n      " +
+		"<file name=\"temp.txt\" mode=\"0644\" prot=\"-rw-r--r--\"></file>\n     " +
+		"</directory>\n     <directory name=\"xelo\" mode=\"0755\" prot=\"drwxr-xr-x\">\n      " +
+		"<file name=\"lwlo.rx\" mode=\"0644\" prot=\"-rw-r--r--\"></file>\n     </directory>\n" +
+		"    </directory>\n  </directory>\n  <report>\n   <directories>4</directories>\n   " +
+		"<files>4</files>\n  </report>\n</tree>"
+	assert.Equal(want, got, "Files in XML format with permission mode test")
+
+	//XML format only directories and permission mode test
+	path = "../resources/test-dir/"
+	cmd = "tree -p -X -d " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
+		"<directory name=\"../resources/test-dir>\n    " +
+		"<directory name=\"empty\" mode=\"0755\" prot=\"drwxr-xr-x\">\n    " +
+		"</directory>\n    <directory name=\"hello\" mode=\"0755\" prot=\"drwxr-xr-x\">\n     " +
+		"<directory name=\"temp\" mode=\"0755\" prot=\"drwxr-xr-x\">\n     </directory>\n     " +
+		"<directory name=\"xelo\" mode=\"0755\" prot=\"drwxr-xr-x\">\n     </directory>\n    " +
+		"</directory>\n  </directory>\n  <report>\n   <directories>4</directories>\n  </report>\n</tree>"
+	assert.Equal(want, got, "XML format only directories and permission mode test")
 }

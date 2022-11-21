@@ -158,9 +158,16 @@ func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, con
 		temp += strings.Repeat(Space, n+2) + OpenTag + "directory name=\"" + root + CloseTag + NewLine
 	}
 
+	closeDirTag := OpenTag + Slash + "directory" + CloseTag + NewLine
+	if n > 0 && n == config.level {
+		return temp + strings.Repeat(Space, n+3) + closeDirTag
+	}
+
 	for _, f := range files {
 		if !f.IsDir() { // file
-			temp += strings.Repeat(Space, n+5) + OpenTag + "file" + getFileAttrsVal(f, *config) + CloseTag + OpenTag + Slash + "file" + CloseTag + NewLine
+			temp += strings.Repeat(Space, n+4) + OpenTag + "file" + getFileAttrsVal(f, *config) + CloseTag +
+				OpenTag + Slash + "file" + CloseTag + NewLine
+
 			fc.fileCnt++
 			continue
 		}
@@ -169,14 +176,11 @@ func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, con
 		temp = RecListDirAndFilesInXML(root+PathSeperator+f.Name(), temp, n+1, fc, config)
 	}
 
-	closeDirTag := OpenTag + Slash + "directory" + CloseTag + NewLine
-
 	if n > 0 {
 		return temp + strings.Repeat(Space, n+3) + closeDirTag
 	}
 
-	temp += strings.Repeat(Space, n+2) + closeDirTag
-	return temp
+	return temp + strings.Repeat(Space, n+2) + closeDirTag
 }
 
 func GetFiles(root string, config TreeConfig) []fs.DirEntry {
@@ -332,25 +336,20 @@ func formatRes(temp string, fc FileCount, config TreeConfig) string {
 			fileStr = fmt.Sprintf("%v file", fc.fileCnt)
 		}
 		op = fmt.Sprintf("%v%v%v", temp, NewLine, dirStr)
+		if !config.reqOnlyDir {
+			op = fmt.Sprintf("%v, %v", op, fileStr)
+		}
 	}
 
 	if config.reqXmlFormat {
 		header := "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-
-		if config.reqXmlFormat {
-			dirStr = fmt.Sprintf("<directories>%v</directories>", fc.dirCnt)
-		}
-		if config.reqXmlFormat {
-			fileStr = fmt.Sprintf("<files>%v</files>", fc.dirCnt)
-		}
-
+		dirStr = fmt.Sprintf("<directories>%v</directories>", fc.dirCnt)
+		fileStr = fmt.Sprintf("<files>%v</files>", fc.dirCnt)
 		report := fmt.Sprintf("  <report>\n   %v\n   %v\n  </report>", dirStr, fileStr)
-
-		return fmt.Sprintf("%v<tree>\n%v%v\n</tree>", header, temp, report)
-	}
-
-	if !config.reqOnlyDir {
-		op = fmt.Sprintf("%v, %v", op, fileStr)
+		if config.reqOnlyDir {
+			report = fmt.Sprintf("  <report>\n   %v\n  </report>", dirStr)
+		}
+		op = fmt.Sprintf("%v<%v>\n%v%v\n</%v>", header, Command, temp, report, Command)
 	}
 	return op
 }
