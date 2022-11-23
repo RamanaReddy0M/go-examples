@@ -214,4 +214,40 @@ func TestListDirAndFiles(t *testing.T) {
 		"<directory name=\"xelo\" mode=\"0755\" prot=\"drwxr-xr-x\">\n     </directory>\n    " +
 		"</directory>\n  </directory>\n  <report>\n   <directories>4</directories>\n  </report>\n</tree>"
 	assert.Equal(want, got, "XML format only directories and permission mode test")
+
+	//JSON format empty dir test
+	path = "../resources/test-dir/empty"
+	cmd = "tree -J " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "[\n  {\"type\":\"directory\",\"name\":\"../resources/test-dir/empty\",\"contents\":[\n" +
+		"  ]}\n,\n  {\"type\":\"report\",\"directories\":0,\"files\":0}\n]"
+	assert.Equal(want, got, "JSON format empty dir test")
+
+	//JSON format single file in directory test
+	path = "../resources/test-dir/hello/temp"
+	cmd = "tree -J " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "[\n  {\"type\":\"directory\",\"name\":\"../resources/test-dir/hello/temp\",\"contents\":[\n" +
+		"    {\"type\":\"file\",\"name\":\"temp.txt\"}\n  ]}\n,\n  " +
+		"{\"type\":\"report\",\"directories\":0,\"files\":1}\n]"
+	assert.Equal(want, got, "JSON format single file in directory test")
+
+	//Files in JSON format with permission mode test
+	path = "../resources/test-dir/"
+	cmd = "tree -p -J " + path
+
+	got = ListDirAndFiles(ParseCommand(cmd))
+	want = "[\n  {\"type\":\"directory\",\"name\":\"../resources/test-dir\",\"contents\":[\n" +
+		"    {\"type\":\"directory\",\"name\":\"empty\",\"mode\":\"0755\",\"prot\":\"drwxr-xr-x\",\"contents\":[\n" +
+		"    ]}\n    {\"type\":\"directory\",\"name\":\"hello\",\"mode\":\"0755\",\"prot\":\"drwxr-xr-x\",\"contents\":[\n" +
+		"     {\"type\":\"file\",\"name\":\"hello.txt\",\"mode\":\"0644\",\"prot\":\"-rw-r--r--\"},\n" +
+		"     {\"type\":\"directory\",\"name\":\"temp\",\"mode\":\"0755\",\"prot\":\"drwxr-xr-x\",\"contents\":[\n" +
+		"      {\"type\":\"file\",\"name\":\"temp.txt\",\"mode\":\"0644\",\"prot\":\"-rw-r--r--\"}\n" +
+		"     ]}\n     {\"type\":\"directory\",\"name\":\"xelo\",\"mode\":\"0755\",\"prot\":\"drwxr-xr-x\",\"contents\":[\n" +
+		"      {\"type\":\"file\",\"name\":\"lwlo.rx\",\"mode\":\"0644\",\"prot\":\"-rw-r--r--\"}\n" +
+		"     ]}\n    ]},\n  ]}\n,\n  {\"type\":\"report\",\"directories\":4,\"files\":3}\n]"
+	assert.Equal(want, got, "Files in JSON format with permission mode test")
+
 }
