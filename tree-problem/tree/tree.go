@@ -16,9 +16,9 @@ type FileCount struct {
 }
 
 type TreeConfig struct {
-	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime, noIndent, reqXmlFormat bool
-	level                                                                        int
-	paths                                                                        []string
+	reqRelPath, reqOnlyDir, reqFilePermsn, sortByModTime, noIndent, reqXmlFormat, reqJsonFormat bool
+	level                                                                                       int
+	paths                                                                                       []string
 }
 
 const (
@@ -33,6 +33,7 @@ const (
 	OpenTag       = "<"
 	Slash         = "/"
 	CloseTag      = ">"
+	JSONArrEnd    = "]}"
 	Command       = "tree"
 	PathSeperator = string(os.PathSeparator)
 	NewLine       = "\n"
@@ -68,6 +69,9 @@ func ParseCommand(cmd string) TreeConfig {
 			config.reqRelPath = true
 		case "-i":
 			config.noIndent = true
+		case "-J":
+			config.reqJsonFormat = true
+			config.reqXmlFormat = false
 		case "-L":
 			if len(ca) < i+1 {
 				log.Fatal("-L option requires value")
@@ -84,6 +88,7 @@ func ParseCommand(cmd string) TreeConfig {
 			config.sortByModTime = true
 		case "-X":
 			config.reqXmlFormat = true
+			config.reqJsonFormat = false
 		default:
 			// check for path
 			if !strings.HasPrefix(arg, "-") {
@@ -108,10 +113,17 @@ func ListDirAndFiles(config TreeConfig) string {
 		fc = FileCount{}
 		isNthDirLast = []bool{}
 		root := strings.TrimSuffix(p, PathSeperator)
+
 		if config.reqXmlFormat {
 			temp += RecListDirAndFilesInXML(root, temp, 0, &fc, &config)
 			continue
 		}
+
+		if config.reqJsonFormat {
+			temp += RecListDirAndFilesInJSON(root, temp, 0, &fc, &config)
+			continue
+		}
+
 		temp += RecListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
 	}
 	return formatRes(temp, fc, config)
@@ -181,6 +193,50 @@ func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, con
 	}
 
 	return temp + strings.Repeat(Space, n+2) + closeDirTag
+}
+
+func RecListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
+	files := GetFiles(root, *config)
+
+	if n == 0 {
+		temp += strings.Repeat(Space, n+2) + "{\"type\":\"directory\",\"name\":\"" + root + "\",\"contents\":[" + NewLine
+	}
+
+	if n > 0 && n == config.level {
+		return temp + strings.Repeat(Space, n+3) + JSONArrEnd + NewLine
+	}
+
+	var lastFile fs.DirEntry
+
+	if len(files) > 0 {
+		lastFile = files[len(files)-1]
+	}
+
+	for _, f := range files {
+		isLastFile := f == lastFile
+		if !f.IsDir() { // file
+			temp += strings.Repeat(Space, n+4) + "{\"type\":\"file\"" + getFileAttrsVal(f, *config) + "}"
+			if !isLastFile {
+				temp += ","
+			}
+			temp += NewLine
+			fc.fileCnt++
+			continue
+		}
+		temp += strings.Repeat(Space, n+4) + "{\"type\":\"directory\"" + getFileAttrsVal(f, *config) + ",\"contents\":[" + NewLine
+		fc.dirCnt++
+		temp = RecListDirAndFilesInJSON(root+PathSeperator+f.Name(), temp, n+1, fc, config)
+	}
+
+	if n > 0 {
+		temp += strings.Repeat(Space, n+3) + JSONArrEnd
+		if len(files) > 1 {
+			temp += ","
+		}
+		return temp + NewLine
+	}
+
+	return temp + strings.Repeat(Space, n+2) + JSONArrEnd + NewLine
 }
 
 func GetFiles(root string, config TreeConfig) []fs.DirEntry {
@@ -313,10 +369,20 @@ func getPermsnMode(f fs.DirEntry, inOctal bool) string {
 }
 
 func getFileAttrsVal(file fs.DirEntry, config TreeConfig) string {
-	attrs := " name=\"" + file.Name() + "\""
-	if config.reqFilePermsn {
-		attrs += " mode=\"" + getPermsnMode(file, true) + "\""
-		attrs += " prot=\"" + getPermsnMode(file, false) + "\""
+	attrs := ""
+	if config.reqXmlFormat {
+		attrs = " name=\"" + file.Name() + "\""
+		if config.reqFilePermsn {
+			attrs += " mode=\"" + getPermsnMode(file, true) + "\""
+			attrs += " prot=\"" + getPermsnMode(file, false) + "\""
+		}
+	}
+	if config.reqJsonFormat {
+		attrs = ",\"name\":\"" + file.Name() + "\""
+		if config.reqFilePermsn {
+			attrs += ",\"mode\":\"" + getPermsnMode(file, true) + "\""
+			attrs += ",\"prot\":\"" + getPermsnMode(file, false) + "\""
+		}
 	}
 	return attrs
 }
@@ -325,7 +391,7 @@ func formatRes(temp string, fc FileCount, config TreeConfig) string {
 	op := ""
 	dirStr := ""
 	fileStr := ""
-	if !config.reqXmlFormat {
+	if !config.reqXmlFormat && !config.reqJsonFormat {
 		dirStr = fmt.Sprintf("%v directories", fc.dirCnt)
 		if fc.dirCnt == 1 {
 			dirStr = fmt.Sprintf("%v directory", fc.dirCnt)
@@ -351,6 +417,14 @@ func formatRes(temp string, fc FileCount, config TreeConfig) string {
 		}
 		op = fmt.Sprintf("%v<%v>\n%v%v\n</%v>", header, Command, temp, report, Command)
 	}
+
+	if config.reqJsonFormat {
+		op = fmt.Sprintf("[\n%v,\n  {\"type\":\"report\",\"directories\":%v", temp, fc.dirCnt)
+		if !config.reqOnlyDir {
+			op = fmt.Sprintf("%v,\"files\":%v}\n]", op, fc.fileCnt)
+		}
+	}
+
 	return op
 }
 
