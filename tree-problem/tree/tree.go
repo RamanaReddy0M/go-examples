@@ -51,15 +51,12 @@ func ParseCommand(cmd string) TreeConfig {
 	//remove extra spaces in cmd
 	regxCmpl := regexp.MustCompile(`\s+`)
 	cmd = strings.TrimSpace(regxCmpl.ReplaceAllString(cmd, Space))
-
 	ca := strings.Split(cmd, Space) //args in command
-
 	if strings.TrimSpace(ca[0]) != Command {
 		log.Fatalf("command not found: `%v`", ca[0])
 	}
 
 	config := NewTreeConfig()
-
 	for i := 1; i < len(ca); i++ {
 		arg := ca[i] //op: option
 		switch arg {
@@ -113,41 +110,34 @@ func ListDirAndFiles(config TreeConfig) string {
 		fc = FileCount{}
 		isNthDirLast = []bool{}
 		root := strings.TrimSuffix(p, PathSeperator)
-
 		if config.reqXmlFormat {
-			temp += RecListDirAndFilesInXML(root, temp, 0, &fc, &config)
+			temp += recListDirAndFilesInXML(root, temp, 0, &fc, &config)
 			continue
 		}
 
 		if config.reqJsonFormat {
-			temp += RecListDirAndFilesInJSON(root, temp, 0, &fc, &config)
+			temp += recListDirAndFilesInJSON(root, temp, 0, &fc, &config)
 			continue
 		}
-
-		temp += RecListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
+		temp += recListDirAndFiles(root, root+NewLine, 0, &isNthDirLast, &fc, &config)
 	}
 	return formatRes(temp, fc, config)
 }
 
-func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, fc *FileCount, config *TreeConfig) string {
+func recListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, fc *FileCount, config *TreeConfig) string {
 	files := GetFiles(root, *config)
-
 	if len(files) < 1 || (config.level > 0 && n == config.level) {
 		*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
 		return temp
 	}
 
 	lastFile := files[len(files)-1]
-
 	for _, f := range files {
 		bp := getBeforePipeVal(n, *isNthDirLast, *config) // before pipe
-
 		isLastFile := lastFile == f
 		pipe := getPipeVal(isLastFile, *config) // pipe (│── or └──)
-
 		ap := getAfterPipeVal(root, f, *config) // after pipe
-
-		temp += bp + pipe + ap + NewLine //line structure in tree
+		temp += bp + pipe + ap + NewLine        //line structure in tree
 
 		if !f.IsDir() { // file
 			fc.fileCnt++
@@ -156,14 +146,13 @@ func RecListDirAndFiles(root string, temp string, n int, isNthDirLast *[]bool, f
 		fc.dirCnt++
 		//tracking information(whether directory last or not) from 0 to Nth level directory
 		*isNthDirLast = append(*isNthDirLast, isLastFile)
-		temp = RecListDirAndFiles(root+PathSeperator+f.Name(), temp, n+1, isNthDirLast, fc, config)
+		temp = recListDirAndFiles(root+PathSeperator+f.Name(), temp, n+1, isNthDirLast, fc, config)
 	}
-
 	*isNthDirLast = resizeToNMinus1(n, *isNthDirLast)
 	return temp
 }
 
-func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
+func recListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
 	files := GetFiles(root, *config)
 
 	if n == 0 {
@@ -179,23 +168,21 @@ func RecListDirAndFilesInXML(root string, temp string, n int, fc *FileCount, con
 		if !f.IsDir() { // file
 			temp += strings.Repeat(Space, n+4) + OpenTag + "file" + getFileAttrsVal(f, *config) + CloseTag +
 				OpenTag + Slash + "file" + CloseTag + NewLine
-
 			fc.fileCnt++
 			continue
 		}
 		temp += strings.Repeat(Space, n+4) + OpenTag + "directory" + getFileAttrsVal(f, *config) + CloseTag + NewLine
 		fc.dirCnt++
-		temp = RecListDirAndFilesInXML(root+PathSeperator+f.Name(), temp, n+1, fc, config)
+		temp = recListDirAndFilesInXML(root+PathSeperator+f.Name(), temp, n+1, fc, config)
 	}
 
 	if n > 0 {
 		return temp + strings.Repeat(Space, n+3) + closeDirTag
 	}
-
 	return temp + strings.Repeat(Space, n+2) + closeDirTag
 }
 
-func RecListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
+func recListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, config *TreeConfig) string {
 	files := GetFiles(root, *config)
 
 	if n == 0 {
@@ -207,7 +194,6 @@ func RecListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, co
 	}
 
 	var lastFile fs.DirEntry
-
 	if len(files) > 0 {
 		lastFile = files[len(files)-1]
 	}
@@ -225,7 +211,7 @@ func RecListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, co
 		}
 		temp += strings.Repeat(Space, n+4) + "{\"type\":\"directory\"" + getFileAttrsVal(f, *config) + ",\"contents\":[" + NewLine
 		fc.dirCnt++
-		temp = RecListDirAndFilesInJSON(root+PathSeperator+f.Name(), temp, n+1, fc, config)
+		temp = recListDirAndFilesInJSON(root+PathSeperator+f.Name(), temp, n+1, fc, config)
 	}
 
 	if n > 0 {
@@ -235,13 +221,11 @@ func RecListDirAndFilesInJSON(root string, temp string, n int, fc *FileCount, co
 		}
 		return temp + NewLine
 	}
-
 	return temp + strings.Repeat(Space, n+2) + JSONArrEnd + NewLine
 }
 
 func GetFiles(root string, config TreeConfig) []fs.DirEntry {
 	files := IgnoreDotFiles(ReadDir(root))
-
 	if config.reqOnlyDir {
 		files = ReadOnlyDir(files)
 	}
