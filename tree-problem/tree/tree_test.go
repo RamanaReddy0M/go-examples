@@ -16,66 +16,138 @@ func TestListDirAndFiles(t *testing.T) {
 
 	tests := []test{
 		{cmd: "tree ../resources/test-dir/empty", desc: "empty dir test",
-			want: "../resources/test-dir/empty\n\n0 directories, 0 files"},
+			want: "../resources/test-dir/empty\n" +
+				  "\n0 directories, 0 files"},
 		{cmd: "tree ", desc: "No paths in command test",
-			want: ".\n│── tree.go\n└── tree_test.go\n\n0 directories, 2 files"},
+			want: ".\n"+
+			      "│── tree.go\n"+
+				  "└── tree_test.go\n\n"+
+				  "0 directories, 2 files"},
 		{cmd: "tree ../resources/test-dir/hello/temp", desc: "Single file in directory test",
-			want: "../resources/test-dir/hello/temp\n└── temp.txt\n\n0 directories, 1 file"},
+			want: "../resources/test-dir/hello/temp\n"+
+			      "└── temp.txt\n\n"+
+				  "0 directories, 1 file"},
 		{cmd: "tree ../resources/test-dir/", desc: "directory with multiple files test",
-			want: "../resources/test-dir\n│── empty\n└── hello\n    │── hello.txt\n " +
-				"   │── temp\n    │   └── temp.txt\n    └── xelo\n        └── lwlo.rx\n" +
-				"\n4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      "│── empty\n"+
+				  "└── hello\n"+
+				  "    │── hello.txt\n" +
+				  "    │── temp\n"+
+				  "    │   └── temp.txt\n"+
+				  "    └── xelo\n"+
+				  "        └── lwlo.rx\n" +
+			      "\n4 directories, 3 files"},
 		{cmd: "tree -f ../resources/test-dir/", desc: "relative path directories test",
-			want: "../resources/test-dir\n│── ../resources/test-dir/empty\n└──" +
-				" ../resources/test-dir/hello\n    │── ../resources/test-dir/hello/hello.txt\n" +
-				"    │── ../resources/test-dir/hello/temp\n    │  " +
-				" └── ../resources/test-dir/hello/temp/temp.txt\n " +
-				"   └── ../resources/test-dir/hello/xelo\n        " +
-				"└── ../resources/test-dir/hello/xelo/lwlo.rx\n\n4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      "│── ../resources/test-dir/empty\n"+
+				  "└── ../resources/test-dir/hello\n"+
+				  "    │── ../resources/test-dir/hello/hello.txt\n" +
+				  "    │── ../resources/test-dir/hello/temp\n"+
+				  "    │   └── ../resources/test-dir/hello/temp/temp.txt\n"+
+				  "    └── ../resources/test-dir/hello/xelo\n"+
+				  "        └── ../resources/test-dir/hello/xelo/lwlo.rx\n\n"+
+				  "4 directories, 3 files"},
 		{cmd: "tree -p ../resources/test-dir/", desc: "Files with permission mode test",
-			want: "../resources/test-dir\n│── [drwxr-xr-x] empty\n└── [drwxr-xr-x] hello\n" +
-				"    │── [-rw-r--r--] hello.txt\n    │── [drwxr-xr-x] temp\n    │   └── [-rw-r--r--]" +
-				" temp.txt\n    └── [drwxr-xr-x] xelo\n        └── [-rw-r--r--] lwlo.rx\n\n" +
-				"4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      "│── [drwxr-xr-x] empty\n"+
+				  "└── [drwxr-xr-x] hello\n" +
+				  "    │── [-rw-r--r--] hello.txt\n"+
+				  "    │── [drwxr-xr-x] temp\n"+
+				  "    │   └── [-rw-r--r--] temp.txt\n"+
+				  "    └── [drwxr-xr-x] xelo\n"+
+				  "        └── [-rw-r--r--] lwlo.rx\n\n" +
+				 "4 directories, 3 files"},
 		{cmd: "tree -t ../resources/test-dir/", desc: "Order files by Modified Time(-t) test",
-			want: "../resources/test-dir\n│── empty\n└── hello\n    │── hello.txt\n" +
-				"    │── temp\n    │   └── temp.txt\n    └── xelo\n        └── lwlo.rx\n\n" +
-				"4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      "│── empty\n"+
+				  "└── hello\n"+
+				  "    │── hello.txt\n" +
+				  "    │── temp\n"+
+				  "    │   └── temp.txt\n"+
+				  "    └── xelo\n"+
+				  "        └── lwlo.rx\n\n" +
+			      "4 directories, 3 files"},
 		{cmd: "tree -i -f ../resources/test-dir/", desc: "List files with 'No-Indentation' test",
-			want: "../resources/test-dir\n ../resources/test-dir/empty\n ../resources/test-dir/hello\n" +
-				" ../resources/test-dir/hello/hello.txt\n ../resources/test-dir/hello/temp\n" +
-				" ../resources/test-dir/hello/temp/temp.txt\n ../resources/test-dir/hello/xelo\n" +
-				" ../resources/test-dir/hello/xelo/lwlo.rx\n\n4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      " ../resources/test-dir/empty\n"+
+				  " ../resources/test-dir/hello\n" +
+				  " ../resources/test-dir/hello/hello.txt\n"+
+				  " ../resources/test-dir/hello/temp\n" +
+				  " ../resources/test-dir/hello/temp/temp.txt\n"+
+				  " ../resources/test-dir/hello/xelo\n" +
+				  " ../resources/test-dir/hello/xelo/lwlo.rx\n\n"+
+				  "4 directories, 3 files"},
 		{cmd: "tree -p -f ../resources/test-dir/", desc: "permission mode and relative path test",
-			want: "../resources/test-dir\n│── [drwxr-xr-x]  ../resources/test-dir/empty\n└── [drwxr-xr-x]" +
-				"  ../resources/test-dir/hello\n    │── [-rw-r--r--]  ../resources/test-dir/hello/hello.txt\n" +
-				"    │── [drwxr-xr-x]  ../resources/test-dir/hello/temp\n    │   └── [-rw-r--r--] " +
-				" ../resources/test-dir/hello/temp/temp.txt\n    └── [drwxr-xr-x]  " +
-				"../resources/test-dir/hello/xelo\n        └── [-rw-r--r--]  " +
-				"../resources/test-dir/hello/xelo/lwlo.rx\n\n4 directories, 3 files"},
+			want: "../resources/test-dir\n"+
+			      "│── [drwxr-xr-x]  ../resources/test-dir/empty\n"+
+				  "└── [drwxr-xr-x]  ../resources/test-dir/hello\n"+
+				  "    │── [-rw-r--r--]  ../resources/test-dir/hello/hello.txt\n" +
+				  "    │── [drwxr-xr-x]  ../resources/test-dir/hello/temp\n"+
+				  "    │   └── [-rw-r--r--]  ../resources/test-dir/hello/temp/temp.txt\n"+
+				  "    └── [drwxr-xr-x]  ../resources/test-dir/hello/xelo\n"+
+				  "        └── [-rw-r--r--]  ../resources/test-dir/hello/xelo/lwlo.rx\n\n"+
+				  "4 directories, 3 files"},
 		{cmd: "tree -L 5 ../resources/level-test-dir", desc: "Level 5 directories test",
-			want: "../resources/level-test-dir\n│── META-INF\n│   └── empty\n└── in\n  " +
-				"  └── one2n\n        └── tree-prblm\n            └── test-dir\n             " +
-				"   │── empty\n                └── hello\n\n8 directories, 0 files"},
+			want: "../resources/level-test-dir\n"+
+			      "│── META-INF\n"+
+				  "│   └── empty\n"+
+				  "└── in\n"+
+				  "    └── one2n\n"+
+				  "        └── tree-prblm\n"+
+				  "            └── test-dir\n"+
+				  "                │── empty\n"+
+				  "                └── hello\n\n"+
+				  "8 directories, 0 files"},
 		{cmd: "tree -L 7 -d ../resources/level-test-dir", desc: "only directories upto 7 levels test",
-			want: "../resources/level-test-dir\n│── META-INF\n│   └── empty\n└── in\n" +
-				"    └── one2n\n        └── tree-prblm\n            └── test-dir\n " +
-				"               │── empty\n                └── hello\n             " +
-				"       │── temp\n                    └── xelo\n\n10 directories"},
+			want: "../resources/level-test-dir\n"+
+			      "│── META-INF\n"+
+				  "│   └── empty\n"+
+				  "└── in\n" +
+				  "    └── one2n\n"+
+				  "        └── tree-prblm\n"+
+				  "            └── test-dir\n"+
+				  "                │── empty\n"+
+				  "                └── hello\n"+
+				  "                    │── temp\n"+
+				  "                    └── xelo\n\n"+
+				  "10 directories"},
 		{cmd: "tree  -L            7   -d -t      -p ../resources/level-test-dir", desc: "Parsing command with odd spaces and mutiple args test",
-			want: "../resources/level-test-dir\n│── [drwxr-xr-x] in\n│   └── [drwxr-xr-x] one2n\n│" +
-				"       └── [drwxr-xr-x] tree-prblm\n│           └── [drwxr-xr-x] test-dir\n│   " +
-				"            │── [drwxr-xr-x] empty\n│               └── [drwxr-xr-x] hello\n│  " +
-				"                 │── [drwxr-xr-x] temp\n│                   └── [drwxr-xr-x] xelo\n" +
-				"└── [drwxr-xr-x] META-INF\n    └── [drwxr-xr-x] empty\n\n10 directories"},
+			want: "../resources/level-test-dir\n"+
+			"│── [drwxr-xr-x] in\n"+
+			"│   └── [drwxr-xr-x] one2n\n"+
+			"│       └── [drwxr-xr-x] tree-prblm\n"+
+			"│           └── [drwxr-xr-x] test-dir\n"+
+			"│               │── [drwxr-xr-x] empty\n"+
+			"│               └── [drwxr-xr-x] hello\n"+
+			"│                   │── [drwxr-xr-x] temp\n"+
+			"│                   └── [drwxr-xr-x] xelo\n" +
+			"└── [drwxr-xr-x] META-INF\n"+
+			"    └── [drwxr-xr-x] empty\n\n"+
+			"10 directories"},
 		{cmd: "tree ../resources/level-test-dir ../resources/test-dir", desc: "Parsing command with odd spaces and mutiple args test",
-			want: "../resources/level-test-dir\n│── META-INF\n│   └── empty\n└── in\n    └── one2n\n        " +
-				"└── tree-prblm\n            └── test-dir\n                │── empty\n                " +
-				"└── hello\n                    │── hello.txt\n                    │── temp\n         " +
-				"           │   └── temp.txt\n                    └── xelo\n                        " +
-				"└── lwlo.rx\n" +
-				"../resources/test-dir\n│── empty\n└── hello\n    │── hello.txt\n    │── temp\n    │   " +
-				"└── temp.txt\n    └── xelo\n        └── lwlo.rx\n\n4 directories, 3 files"},
+			want: "../resources/level-test-dir\n"+
+			      "│── META-INF\n"+
+				  "│   └── empty\n"+
+				  "└── in\n"+
+				  "    └── one2n\n"+
+				  "        └── tree-prblm\n"+
+				  "            └── test-dir\n"+
+				  "                │── empty\n"+
+				  "                └── hello\n"+
+				  "                    │── hello.txt\n"+
+				  "                    │── temp\n"+
+				  "                    │   └── temp.txt\n"+
+				  "                    └── xelo\n"+
+				  "                        └── lwlo.rx\n" +
+				  "../resources/test-dir\n"+
+				  "│── empty\n"+
+				  "└── hello\n"+
+				  "    │── hello.txt\n"+
+				  "    │── temp\n"+
+				  "    │   └── temp.txt\n"+
+				  "    └── xelo\n"+
+				  "        └── lwlo.rx\n\n"+
+				  "4 directories, 3 files"},
 		{cmd: "tree -X ../resources/test-dir/empty", desc: "XML format empty dir test",
 			want: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<tree>\n  " +
 				"<directory name=\"../resources/test-dir/empty>\n  </directory>\n  <report>\n   " +
